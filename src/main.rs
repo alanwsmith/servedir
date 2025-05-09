@@ -45,6 +45,7 @@ impl DirServer {
             .into_iter()
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| Some(entry.into_path()))
+            .filter_map(|path| std::path::absolute(path).ok())
             .filter(|path| self.check_path(&path))
             .for_each(|path| {
                 let _ = self.detect_change(&path);
@@ -56,6 +57,8 @@ impl DirServer {
         if !self.check_path(path) {
             None
         } else {
+            dbg!(&path);
+
             //let hash = self.hash_file(path).ok();
             //let mut stmt = self
             //    .conn
@@ -115,6 +118,7 @@ impl DirServer {
         }
     }
 }
+
 //    // match event.event.kind {
 //    //     notify::EventKind::Create(..) => {
 //    //         false

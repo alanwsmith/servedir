@@ -7,6 +7,8 @@ use notify::RecursiveMode;
 use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::new_debouncer;
 use rusqlite::Connection;
+use rusqlite::OptionalExtension;
+use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -41,14 +43,36 @@ impl DirServer {
     }
 
     pub fn load_files(&self) -> Result<()> {
-        let files: Vec<_> = WalkDir::new(&self.dir)
+        WalkDir::new(&self.dir)
             .into_iter()
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| Some(entry.into_path()))
             .filter(|path| self.check_path(&path))
-            .collect();
-        dbg!(&files);
+            .for_each(|path| {
+                let _ = self.detect_change(&path);
+            });
         Ok(())
+    }
+
+    pub fn detect_change(&self, path: &PathBuf) -> Result<()> {
+        let hash = self.hash_file(path)?;
+        let insert_data = "INSERT INTO files (path, hash) VALUES (?1, ?2)";
+        self.conn
+            .execute(insert_data, (path.display().to_string(), hash))?;
+        let mut stmt = self.conn.prepare("SELECT hash FROM files");
+        stmt?.query_row([], |r| {
+            dbg!(r);
+            Ok(())
+        });
+        Ok(())
+    }
+
+    pub fn hash_file(&self, path: &PathBuf) -> Result<String> {
+        let contents = std::fs::read(path)?;
+        let mut hasher = Sha256::new();
+        hasher.update(contents);
+        let result: String = format!("{:X}", hasher.finalize());
+        Ok((result))
     }
 
     pub fn new() -> Result<DirServer> {
@@ -60,6 +84,9 @@ impl DirServer {
                 hash TEXT NOT NULL 
             )";
         conn.execute(create_table_sql, ())?;
+
+        // seed test data
+
         Ok(DirServer { conn, dir })
     }
 }

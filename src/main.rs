@@ -1,19 +1,15 @@
-#![allow(unused)]
 use anyhow::Result;
 use axum::Router;
 use axum::response::Html;
 use axum::routing::get;
 use notify::RecursiveMode;
-use notify::Watcher;
 use notify_debouncer_full::DebounceEventResult;
-use notify_debouncer_full::DebouncedEvent;
 use notify_debouncer_full::new_debouncer;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 use tower_http::services::ServeDir;
 use tower_livereload::LiveReloadLayer;
-use tower_livereload::Reloader;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,11 +26,11 @@ async fn run_server() -> Result<()> {
         .not_found_service(get(|| missing_page()));
     let app = Router::new().fallback_service(service).layer(livereload);
     let mut debouncer = new_debouncer(
-        Duration::from_millis(250),
+        Duration::from_millis(150),
         None,
         move |result: DebounceEventResult| {
             if let Ok(debounced) = result {
-                debounced.iter().find(|event| {
+                if let Some(_) = debounced.iter().find(|event| {
                     // dbg!(&event.event);
                     match event.event.kind {
                         notify::EventKind::Create(..) => has_trigger_file(&event.paths),
@@ -46,32 +42,11 @@ async fn run_server() -> Result<()> {
                         },
                         _ => false,
                     }
-                });
-
-                // match debounced {
-                //     DebouncedEvent { event, .. } => {
-                //         dbg!(event);
-                //         ()
-                //     }
-                // }
-
-                //                dbg!(debounced);
+                }) {
+                    reloader.reload();
+                }
             }
-        }, // Ok(events) => {
-           //     events
-           //         .iter()
-           //         .find(|event| {
-           //             // dbg!(&event.event.kind);
-           //             match event.event.kind {
-           //                 notify::EventKind::Create(..) => true,
-           //                 _ => false,
-           //             }
-           //             // println!("{event:?}");
-           //             // reloader.reload();
-           //         })
-           // }
-           // Err(errors) => false,
-           //
+        },
     )?;
     debouncer.watch(".", RecursiveMode::Recursive)?;
     let listener = tokio::net::TcpListener::bind("0.0.0.0:5444").await.unwrap();
@@ -80,18 +55,21 @@ async fn run_server() -> Result<()> {
 }
 
 fn has_trigger_file(paths: &Vec<PathBuf>) -> bool {
-    paths
+    if let Some(path) = paths
         .iter()
         .filter(|p| p.is_file())
         .filter(|p| !p.ends_with("~"))
-        .filter_map(|p| p.file_name())
-        .map(|file_name| file_name.to_string_lossy())
-        .filter(|file_name| !file_name.starts_with("."))
-        .find(|file_name| {
-            dbg!(&file_name);
-            true
+        .filter(|p| match p.file_name() {
+            Some(name) => !name.to_string_lossy().starts_with("."),
+            None => false,
         })
-        .is_some()
+        .find_map(|p| Some(p))
+    {
+        println!("{}", path.display());
+        true
+    } else {
+        false
+    }
 }
 
 async fn missing_page() -> Html<&'static str> {

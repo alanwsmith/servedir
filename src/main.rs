@@ -57,23 +57,22 @@ impl DirServer {
         if !self.check_path(path) {
             None
         } else {
-            dbg!(&path);
-            if let Ok(mut stmt) = self.conn.prepare("SELECT hash FROM files WHERE path = ?") {
-                if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
-                    row.get::<usize, String>(0)
-                }) {
-                    if rows.count() == 0 {
-                        if let Ok(mut insert_sql) = self
-                            .conn
-                            .prepare("INSERT INTO files (path, hash) VALUES (?1, ?2)")
-                        {
-                            dbg!(insert_sql);
+            if let Ok(hash) = self.hash_file(path) {
+                dbg!(&hash);
+                if let Ok(mut stmt) = self.conn.prepare("SELECT hash FROM files WHERE path = ?") {
+                    if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
+                        row.get::<usize, String>(0)
+                    }) {
+                        if rows.count() == 0 {
+                            self.conn.execute(
+                                "INSERT INTO files (path, hash) VALUES (?1, ?2)",
+                                (path.display().to_string(), "asdf".to_string()),
+                            );
                         }
                     }
                 }
             }
 
-            //let hash = self.hash_file(path).ok();
             //if stmt.query_row([format!("x{}", path.display().to_string())], |r| {
             //    // let check_hash = r.get_unwrap::<usize, String>(0);
             //    Ok(())

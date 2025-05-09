@@ -4,6 +4,7 @@ use axum::Router;
 use axum::response::Html;
 use axum::routing::get;
 use notify::RecursiveMode;
+use notify::event::DataChange;
 use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::new_debouncer;
 use rusqlite::Connection;
@@ -96,12 +97,32 @@ impl DirServer {
             // dbg!(&events[0]);
             events
                 .iter()
-                .filter_map(|e| {
-                    dbg!(e);
-                    None::<String>
-                })
-                .find(|p| {
-                    dbg!(p);
+                // .filter_map(|e| {
+                //     dbg!(e);
+                //     None::<String>
+                // })
+                .find(|event| {
+                    // dbg!(&event);
+                    match event.event.kind {
+                        notify::EventKind::Create(..) => {
+                            // dbg!(&event);
+                            ()
+                        }
+                        notify::EventKind::Modify(change_kind) => {
+                            match change_kind {
+                                notify::event::ModifyKind::Data(..) => {
+                                    &event.paths.iter().find(|p| self.detect_change(&p).is_ok());
+                                    dbg!(&event.paths);
+                                    ()
+                                }
+                                _ => (),
+                            }
+
+                            ()
+                        }
+                        _ => (),
+                    }
+                    // dbg!(event);
                     false
                 });
 
@@ -113,50 +134,80 @@ impl DirServer {
         } else {
             None
         }
-
-        //debounced.iter().filter_map(|event| {
-        //    dbg!(&event);
-        //    // event.is
-        //    //find(|event| {
-        //    //dbg!(event?);
-        //    //false
-        //    Some("asdf".to_string())
-        //});
-
-        //    // // dbg!(&event.event);
-        //    // match event.event.kind {
-        //    //     notify::EventKind::Create(..) => {
-        //    //         false
-        //    //         // if has_trigger_file(&event.paths) {
-        //    //         //     true
-        //    //         // } else {
-        //    //         //     false
-        //    //         // }
-        //    //     }
-        //    //     notify::EventKind::Modify(payload) => match payload {
-        //    //         notify::event::ModifyKind::Data(change_type) => match change_type {
-        //    //             _ => {
-        //    //                 false
-        //    //                 // if has_trigger_file(&event.paths) {
-        //    //                 //     dbg!(&event);
-        //    //                 //     true
-        //    //                 // } else {
-        //    //                 //     false
-        //    //                 // }
-        //    //             }
-        //    //         },
-        //    //         _ => false,
-        //    //     },
-        //    //     _ => false,
-        //    // }
-        //}) {
-        //    //reloader.reload();
-        //}
-        //}
-
-        // false
     }
 }
+//    // match event.event.kind {
+//    //     notify::EventKind::Create(..) => {
+//    //         false
+//    //         // if has_trigger_file(&event.paths) {
+//    //         //     true
+//    //         // } else {
+//    //         //     false
+//    //         // }
+//    //     }
+//    //     notify::EventKind::Modify(payload) => match payload {
+//    //         notify::event::ModifyKind::Data(change_type) => match change_type {
+//    //             _ => {
+//    //                 false
+//    //                 // if has_trigger_file(&event.paths) {
+//    //                 //     dbg!(&event);
+//    //                 //     true
+//    //                 // } else {
+//    //                 //     false
+//    //                 // }
+//    //             }
+//    //         },
+//    //         _ => false,
+//    //     },
+//    //     _ => false,
+//    // }
+
+//}) {
+//    //reloader.reload();
+//}
+//}
+
+//debounced.iter().filter_map(|event| {
+//    dbg!(&event);
+//    // event.is
+//    //find(|event| {
+//    //dbg!(event?);
+//    //false
+//    Some("asdf".to_string())
+//});
+
+//    // // dbg!(&event.event);
+//    // match event.event.kind {
+//    //     notify::EventKind::Create(..) => {
+//    //         false
+//    //         // if has_trigger_file(&event.paths) {
+//    //         //     true
+//    //         // } else {
+//    //         //     false
+//    //         // }
+//    //     }
+//    //     notify::EventKind::Modify(payload) => match payload {
+//    //         notify::event::ModifyKind::Data(change_type) => match change_type {
+//    //             _ => {
+//    //                 false
+//    //                 // if has_trigger_file(&event.paths) {
+//    //                 //     dbg!(&event);
+//    //                 //     true
+//    //                 // } else {
+//    //                 //     false
+//    //                 // }
+//    //             }
+//    //         },
+//    //         _ => false,
+//    //     },
+//    //     _ => false,
+//    // }
+//}) {
+//    //reloader.reload();
+//}
+//}
+
+// false
 
 #[tokio::main]
 async fn main() -> Result<()> {

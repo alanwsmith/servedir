@@ -62,7 +62,14 @@ impl DirServer {
                 if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
                     row.get::<usize, String>(0)
                 }) {
-                    dbg!(rows.count());
+                    if rows.count() == 0 {
+                        if let Ok(mut insert_sql) = self
+                            .conn
+                            .prepare("INSERT INTO files (path, hash) VALUES (?1, ?2)")
+                        {
+                            dbg!(insert_sql);
+                        }
+                    }
                 }
             }
 

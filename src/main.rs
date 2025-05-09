@@ -37,23 +37,13 @@ async fn run_server() -> Result<()> {
                 debounced.iter().find(|event| {
                     // dbg!(&event.event);
                     match event.event.kind {
-                        notify::EventKind::Create(..) => event
-                            .paths
-                            .iter()
-                            .filter(|p| p.is_file())
-                            .filter(|p| !p.ends_with("~"))
-                            .filter_map(|p| p.file_name())
-                            .map(|file_name| file_name.to_string_lossy())
-                            .filter(|file_name| !file_name.starts_with("."))
-                            .find(|file_name| {
-                                dbg!(&file_name);
-                                true
-                            })
-                            .is_some(),
-                        notify::EventKind::Modify(payload) => {
-                            dbg!(&payload);
-                            false
-                        }
+                        notify::EventKind::Create(..) => has_trigger_file(&event.paths),
+                        notify::EventKind::Modify(payload) => match payload {
+                            notify::event::ModifyKind::Data(change_type) => match change_type {
+                                _ => has_trigger_file(&event.paths),
+                            },
+                            _ => false,
+                        },
                         _ => false,
                     }
                 });
@@ -89,8 +79,19 @@ async fn run_server() -> Result<()> {
     Ok(())
 }
 
-fn is_trigger_file(path: &PathBuf) -> bool {
-    false
+fn has_trigger_file(paths: &Vec<PathBuf>) -> bool {
+    paths
+        .iter()
+        .filter(|p| p.is_file())
+        .filter(|p| !p.ends_with("~"))
+        .filter_map(|p| p.file_name())
+        .map(|file_name| file_name.to_string_lossy())
+        .filter(|file_name| !file_name.starts_with("."))
+        .find(|file_name| {
+            dbg!(&file_name);
+            true
+        })
+        .is_some()
 }
 
 async fn missing_page() -> Html<&'static str> {

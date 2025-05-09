@@ -58,12 +58,15 @@ impl DirServer {
             None
         } else {
             dbg!(&path);
+            if let Ok(mut stmt) = self.conn.prepare("SELECT hash FROM files WHERE path = ?") {
+                if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
+                    row.get::<usize, String>(0)
+                }) {
+                    dbg!(rows.count());
+                }
+            }
 
             //let hash = self.hash_file(path).ok();
-            //let mut stmt = self
-            //    .conn
-            //    .prepare("SELECT hash FROM files WHERE path = ?")
-            //    .ok();
             //if stmt.query_row([format!("x{}", path.display().to_string())], |r| {
             //    // let check_hash = r.get_unwrap::<usize, String>(0);
             //    Ok(())

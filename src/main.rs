@@ -19,12 +19,8 @@ struct DirServer {
     pub conn: Connection,
 }
 
-fn is_hidden(path: &PathBuf) -> bool {
-    path.iter()
-        .skip(1)
-        .filter_map(|p| p.to_str())
-        .any(|part| part.starts_with(".") || part == "target")
-}
+//
+// sfn is_hidden(path: &PathBuf) -> bool {}
 
 impl DirServer {
     pub fn check_path(&self, path: &PathBuf) -> bool {
@@ -32,7 +28,12 @@ impl DirServer {
             false
         } else if path.ends_with("~") {
             false
-        } else if is_hidden(&path) {
+        } else if path
+            .iter()
+            .skip(1)
+            .filter_map(|p| p.to_str())
+            .any(|part| part.starts_with(".") || part == "target")
+        {
             false
         } else {
             true

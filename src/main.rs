@@ -21,9 +21,6 @@ struct DirServer {
     pub conn: Connection,
 }
 
-//
-// sfn is_hidden(path: &PathBuf) -> bool {}
-
 impl DirServer {
     pub fn check_path(&self, path: &PathBuf) -> bool {
         if !path.is_file() {
@@ -56,14 +53,19 @@ impl DirServer {
 
     pub fn detect_change(&self, path: &PathBuf) -> Result<()> {
         let hash = self.hash_file(path)?;
-        let insert_data = "INSERT INTO files (path, hash) VALUES (?1, ?2)";
-        self.conn
-            .execute(insert_data, (path.display().to_string(), hash))?;
-        let mut stmt = self.conn.prepare("SELECT hash FROM files");
-        stmt?.query_row([], |r| {
-            dbg!(r);
-            Ok(())
-        });
+        let mut stmt = self.conn.prepare("SELECT hash FROM files WHERE path = ?");
+        if !stmt?
+            .query_row([format!("x{}", path.display().to_string())], |r| {
+                let check_hash = r.get_unwrap::<usize, String>(0);
+                Ok(())
+            })
+            .is_ok()
+        {
+            dbg!("inserting data");
+            let insert_data = "INSERT INTO files (path, hash) VALUES (?1, ?2)";
+            self.conn
+                .execute(insert_data, (path.display().to_string(), hash))?;
+        };
         Ok(())
     }
 

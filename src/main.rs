@@ -52,22 +52,28 @@ impl DirServer {
         Ok(())
     }
 
-    pub fn detect_change(&self, path: &PathBuf) -> Result<()> {
-        let hash = self.hash_file(path)?;
-        let mut stmt = self.conn.prepare("SELECT hash FROM files WHERE path = ?");
-        if !stmt?
-            .query_row([format!("x{}", path.display().to_string())], |r| {
-                let check_hash = r.get_unwrap::<usize, String>(0);
-                Ok(())
-            })
-            .is_ok()
-        {
-            dbg!("inserting data");
-            let insert_data = "INSERT INTO files (path, hash) VALUES (?1, ?2)";
-            self.conn
-                .execute(insert_data, (path.display().to_string(), hash))?;
-        };
-        Ok(())
+    pub fn detect_change(&self, path: &PathBuf) -> Option<PathBuf> {
+        if !self.check_path(path) {
+            None
+        } else {
+            //let hash = self.hash_file(path).ok();
+            //let mut stmt = self
+            //    .conn
+            //    .prepare("SELECT hash FROM files WHERE path = ?")
+            //    .ok();
+            //if stmt.query_row([format!("x{}", path.display().to_string())], |r| {
+            //    // let check_hash = r.get_unwrap::<usize, String>(0);
+            //    Ok(())
+            //}) {
+            //    dbg!("inserting data");
+            //    // let insert_data = "INSERT INTO files (path, hash) VALUES (?1, ?2)";
+            //    // self.conn
+            //    //     .execute(insert_data, (path.display().to_string(), hash))
+            //    //     .is_ok();
+            //    //
+            //};
+            None
+        }
     }
 
     pub fn hash_file(&self, path: &PathBuf) -> Result<String> {
@@ -91,46 +97,19 @@ impl DirServer {
     }
 
     pub fn process_event(&self, debounced: DebounceEventResult) -> Option<PathBuf> {
-        //
-        //dbg!(&debounced);
         if let Ok(events) = debounced {
-            // dbg!(&events[0]);
-            events
-                .iter()
-                // .filter_map(|e| {
-                //     dbg!(e);
-                //     None::<String>
-                // })
-                .find(|event| {
-                    // dbg!(&event);
-                    match event.event.kind {
-                        notify::EventKind::Create(..) => {
-                            // dbg!(&event);
-                            ()
-                        }
-                        notify::EventKind::Modify(change_kind) => {
-                            match change_kind {
-                                notify::event::ModifyKind::Data(..) => {
-                                    &event.paths.iter().find(|p| self.detect_change(&p).is_ok());
-                                    dbg!(&event.paths);
-                                    ()
-                                }
-                                _ => (),
-                            }
-
-                            ()
-                        }
-                        _ => (),
+            events.iter().find_map(|event| match event.event.kind {
+                notify::EventKind::Create(..) => {
+                    event.paths.iter().find_map(|p| self.detect_change(&p))
+                }
+                notify::EventKind::Modify(change_kind) => match change_kind {
+                    notify::event::ModifyKind::Data(..) => {
+                        event.paths.iter().find_map(|p| self.detect_change(&p))
                     }
-                    // dbg!(event);
-                    false
-                });
-
-            // &events.iter().filter_map(|event| {
-            //     dbg!(&event);
-            //     None::<String>
-            // });
-            None
+                    _ => None,
+                },
+                _ => None,
+            })
         } else {
             None
         }

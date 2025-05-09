@@ -86,70 +86,70 @@ impl DirServer {
                 hash TEXT NOT NULL 
             )";
         conn.execute(create_table_sql, ())?;
-
-        // seed test data
-
         Ok(DirServer { conn, dir })
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let ds = DirServer::new()?;
-    ds.load_files()?;
-    // run_server().await?;
+    run_server().await?;
     Ok(())
 }
 
 async fn run_server() -> Result<()> {
+    let ds = DirServer::new()?;
+    ds.load_files()?;
     let dir = Path::new(".");
     let conn = Connection::open_in_memory()?;
+    let livereload = LiveReloadLayer::new();
+    let reloader = livereload.reloader();
+    let service = ServeDir::new(&ds.dir)
+        .append_index_html_on_directories(true)
+        .not_found_service(get(|| missing_page()));
+    let app = Router::new().fallback_service(service).layer(livereload);
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(150),
+        None,
+        move |result: DebounceEventResult| {
+            if let Ok(debounced) = result {
+                if let Some(_) = debounced.iter().find(|event| {
+                    // dbg!(&event.event);
+                    match event.event.kind {
+                        notify::EventKind::Create(..) => {
+                            false
 
-    // let livereload = LiveReloadLayer::new();
-    // let reloader = livereload.reloader();
-    // let service = ServeDir::new(dir_to_serve)
-    //     .append_index_html_on_directories(true)
-    //     .not_found_service(get(|| missing_page()));
-    // let app = Router::new().fallback_service(service).layer(livereload);
-    // let mut debouncer = new_debouncer(
-    //     Duration::from_millis(150),
-    //     None,
-    //     move |result: DebounceEventResult| {
-    //         if let Ok(debounced) = result {
-    //             if let Some(_) = debounced.iter().find(|event| {
-    //                 // dbg!(&event.event);
-    //                 match event.event.kind {
-    //                     notify::EventKind::Create(..) => {
-    //                         if has_trigger_file(&event.paths) {
-    //                             true
-    //                         } else {
-    //                             false
-    //                         }
-    //                     }
-    //                     notify::EventKind::Modify(payload) => match payload {
-    //                         notify::event::ModifyKind::Data(change_type) => match change_type {
-    //                             _ => {
-    //                                 if has_trigger_file(&event.paths) {
-    //                                     dbg!(&event);
-    //                                     true
-    //                                 } else {
-    //                                     false
-    //                                 }
-    //                             }
-    //                         },
-    //                         _ => false,
-    //                     },
-    //                     _ => false,
-    //                 }
-    //             }) {
-    //                 reloader.reload();
-    //             }
-    //         }
-    //     },
-    // )?;
-    // debouncer.watch(".", RecursiveMode::Recursive)?;
-    // let listener = tokio::net::TcpListener::bind("0.0.0.0:5444").await.unwrap();
-    // axum::serve(listener, app).await.unwrap();
+                            // if has_trigger_file(&event.paths) {
+                            //     true
+                            // } else {
+                            //     false
+                            // }
+                        }
+                        notify::EventKind::Modify(payload) => match payload {
+                            notify::event::ModifyKind::Data(change_type) => match change_type {
+                                _ => {
+                                    false
+
+                                    // if has_trigger_file(&event.paths) {
+                                    //     dbg!(&event);
+                                    //     true
+                                    // } else {
+                                    //     false
+                                    // }
+                                }
+                            },
+                            _ => false,
+                        },
+                        _ => false,
+                    }
+                }) {
+                    //reloader.reload();
+                }
+            }
+        },
+    )?;
+    debouncer.watch(".", RecursiveMode::Recursive)?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:5444").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 
     Ok(())
 }

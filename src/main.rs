@@ -88,6 +88,74 @@ impl DirServer {
         conn.execute(create_table_sql, ())?;
         Ok(DirServer { conn, dir })
     }
+
+    pub fn process_event(&self, debounced: DebounceEventResult) -> Option<PathBuf> {
+        //
+        //dbg!(&debounced);
+        if let Ok(events) = debounced {
+            // dbg!(&events[0]);
+            events
+                .iter()
+                .filter_map(|e| {
+                    dbg!(e);
+                    None::<String>
+                })
+                .find(|p| {
+                    dbg!(p);
+                    false
+                });
+
+            // &events.iter().filter_map(|event| {
+            //     dbg!(&event);
+            //     None::<String>
+            // });
+            None
+        } else {
+            None
+        }
+
+        //debounced.iter().filter_map(|event| {
+        //    dbg!(&event);
+        //    // event.is
+        //    //find(|event| {
+        //    //dbg!(event?);
+        //    //false
+        //    Some("asdf".to_string())
+        //});
+
+        //    // // dbg!(&event.event);
+        //    // match event.event.kind {
+        //    //     notify::EventKind::Create(..) => {
+        //    //         false
+        //    //         // if has_trigger_file(&event.paths) {
+        //    //         //     true
+        //    //         // } else {
+        //    //         //     false
+        //    //         // }
+        //    //     }
+        //    //     notify::EventKind::Modify(payload) => match payload {
+        //    //         notify::event::ModifyKind::Data(change_type) => match change_type {
+        //    //             _ => {
+        //    //                 false
+        //    //                 // if has_trigger_file(&event.paths) {
+        //    //                 //     dbg!(&event);
+        //    //                 //     true
+        //    //                 // } else {
+        //    //                 //     false
+        //    //                 // }
+        //    //             }
+        //    //         },
+        //    //         _ => false,
+        //    //     },
+        //    //     _ => false,
+        //    // }
+        //}) {
+        //    //reloader.reload();
+        //}
+        //}
+
+        // false
+    }
 }
 
 #[tokio::main]
@@ -108,49 +176,50 @@ async fn run_server() -> Result<()> {
         .not_found_service(get(|| missing_page()));
     let app = Router::new().fallback_service(service).layer(livereload);
     let mut debouncer = new_debouncer(
-        Duration::from_millis(150),
+        Duration::from_millis(200),
         None,
         move |result: DebounceEventResult| {
-            if let Ok(debounced) = result {
-                if let Some(_) = debounced.iter().find(|event| {
-                    // dbg!(&event.event);
-                    match event.event.kind {
-                        notify::EventKind::Create(..) => {
-                            false
-
-                            // if has_trigger_file(&event.paths) {
-                            //     true
-                            // } else {
-                            //     false
-                            // }
-                        }
-                        notify::EventKind::Modify(payload) => match payload {
-                            notify::event::ModifyKind::Data(change_type) => match change_type {
-                                _ => {
-                                    false
-
-                                    // if has_trigger_file(&event.paths) {
-                                    //     dbg!(&event);
-                                    //     true
-                                    // } else {
-                                    //     false
-                                    // }
-                                }
-                            },
-                            _ => false,
-                        },
-                        _ => false,
-                    }
-                }) {
-                    //reloader.reload();
-                }
+            //if let Ok(debounced) = result {
+            if ds.process_event(result).is_some() {
+                reloader.reload();
             }
+
+            //if let Some(_) = debounced.iter().find(|event| {
+            //    // // dbg!(&event.event);
+            //    // match event.event.kind {
+            //    //     notify::EventKind::Create(..) => {
+            //    //         false
+            //    //         // if has_trigger_file(&event.paths) {
+            //    //         //     true
+            //    //         // } else {
+            //    //         //     false
+            //    //         // }
+            //    //     }
+            //    //     notify::EventKind::Modify(payload) => match payload {
+            //    //         notify::event::ModifyKind::Data(change_type) => match change_type {
+            //    //             _ => {
+            //    //                 false
+            //    //                 // if has_trigger_file(&event.paths) {
+            //    //                 //     dbg!(&event);
+            //    //                 //     true
+            //    //                 // } else {
+            //    //                 //     false
+            //    //                 // }
+            //    //             }
+            //    //         },
+            //    //         _ => false,
+            //    //     },
+            //    //     _ => false,
+            //    // }
+            //}) {
+            //    //reloader.reload();
+            //}
+            //}
         },
     )?;
     debouncer.watch(".", RecursiveMode::Recursive)?;
     let listener = tokio::net::TcpListener::bind("0.0.0.0:5444").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-
     Ok(())
 }
 

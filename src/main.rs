@@ -57,20 +57,44 @@ impl DirServer {
         if !self.check_path(path) {
             None
         } else {
-            if let Ok(hash) = self.hash_file(path) {
-                dbg!(&hash);
+            if let Ok(new_hash) = self.hash_file(path) {
+                // dbg!(&new_hash);
                 if let Ok(mut stmt) = self.conn.prepare("SELECT hash FROM files WHERE path = ?") {
-                    if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
-                        row.get::<usize, String>(0)
-                    }) {
-                        if rows.count() == 0 {
+                    if let Ok(row) =
+                        stmt.query_row([path.display().to_string()], |r| r.get::<usize, String>(0))
+                    {
+                        if &row != &new_hash {
+                            dbg!("changed");
+                            dbg!(&new_hash);
                             self.conn.execute(
-                                "INSERT INTO files (path, hash) VALUES (?1, ?2)",
-                                (path.display().to_string(), "asdf".to_string()),
+                                "UPDATE TABLE files SET hash = ? WHERE path = ?",
+                                (&new_hash, path.display().to_string()),
                             );
                         }
+                    } else {
+                        self.conn.execute(
+                            "INSERT INTO files (path, hash) VALUES (?1, ?2)",
+                            (path.display().to_string(), &new_hash),
+                        );
                     }
+
+                    // if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
+                    //     row.get::<usize, String>(0)
+                    // }) {
+                    //     if rows.count() == 0 {
+                    //         dbg!("adding fresh");
+                    //         self.conn.execute(
+                    //             "INSERT INTO files (path, hash) VALUES (?1, ?2)",
+                    //             (path.display().to_string(), &new_hash),
+                    //         );
+                    //     } else {
+                    //         dbg!("found something to compare");
+                    //     }
+                    // }
                 }
+                None
+            } else {
+                None
             }
 
             //if stmt.query_row([format!("x{}", path.display().to_string())], |r| {
@@ -84,7 +108,6 @@ impl DirServer {
             //    //     .is_ok();
             //    //
             //};
-            None
         }
     }
 

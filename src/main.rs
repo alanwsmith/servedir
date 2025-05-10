@@ -1,14 +1,11 @@
-#![allow(unused)]
 use anyhow::Result;
 use axum::Router;
 use axum::response::Html;
 use axum::routing::get;
 use notify::RecursiveMode;
-use notify::event::DataChange;
 use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::new_debouncer;
 use rusqlite::Connection;
-use rusqlite::OptionalExtension;
 use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::path::PathBuf;
@@ -63,8 +60,8 @@ impl DirServer {
                         stmt.query_row([path.display().to_string()], |r| r.get::<usize, String>(0))
                     {
                         if &row != &new_hash {
-                            self.conn.execute(
-                                "UPDATE TABLE files SET hash = ? WHERE path = ?",
+                            let x = self.conn.execute(
+                                "UPDATE files SET hash = ? WHERE path = ?",
                                 (&new_hash, path.display().to_string()),
                             );
                             Some(path.to_path_buf())
@@ -88,7 +85,7 @@ impl DirServer {
     }
 
     pub fn hash_file(&self, path: &PathBuf) -> Result<String> {
-        let contents = std::fs::read(path)?;
+        let contents = std::fs::read_to_string(path)?;
         let mut hasher = Sha256::new();
         hasher.update(contents);
         let result: String = format!("{:X}", hasher.finalize());
@@ -109,6 +106,7 @@ impl DirServer {
 
     pub fn process_event(&self, debounced: DebounceEventResult) -> Option<PathBuf> {
         if let Ok(events) = debounced {
+            println!("EVENTS");
             events.iter().find_map(|event| match event.event.kind {
                 notify::EventKind::Create(..) => {
                     event.paths.iter().find_map(|p| self.detect_change(&p))
@@ -218,12 +216,11 @@ async fn run_server() -> Result<()> {
         .not_found_service(get(|| missing_page()));
     let app = Router::new().fallback_service(service).layer(livereload);
     let mut debouncer = new_debouncer(
-        Duration::from_millis(200),
+        Duration::from_millis(100),
         None,
         move |result: DebounceEventResult| {
-            //if let Ok(debounced) = result {
             if let Some(path) = ds.process_event(result) {
-                println!("{}", path.display());
+                println!("Reload via: {}", path.display());
                 reloader.reload();
             }
 

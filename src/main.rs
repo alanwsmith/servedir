@@ -7,7 +7,6 @@ use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::new_debouncer;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
-use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 use tower_http::services::ServeDir;
@@ -60,7 +59,8 @@ impl DirServer {
                         stmt.query_row([path.display().to_string()], |r| r.get::<usize, String>(0))
                     {
                         if &row != &new_hash {
-                            let x = self.conn.execute(
+                            // TODO: Handle this as an error
+                            let _ = self.conn.execute(
                                 "UPDATE files SET hash = ? WHERE path = ?",
                                 (&new_hash, path.display().to_string()),
                             );
@@ -69,7 +69,8 @@ impl DirServer {
                             None
                         }
                     } else {
-                        self.conn.execute(
+                        // TODO: Handle this as an error
+                        let _ = self.conn.execute(
                             "INSERT INTO files (path, hash) VALUES (?1, ?2)",
                             (path.display().to_string(), &new_hash),
                         );
@@ -89,7 +90,7 @@ impl DirServer {
         let mut hasher = Sha256::new();
         hasher.update(contents);
         let result: String = format!("{:X}", hasher.finalize());
-        Ok((result))
+        Ok(result)
     }
 
     pub fn new() -> Result<DirServer> {
@@ -106,7 +107,6 @@ impl DirServer {
 
     pub fn process_event(&self, debounced: DebounceEventResult) -> Option<PathBuf> {
         if let Ok(events) = debounced {
-            println!("EVENTS");
             events.iter().find_map(|event| match event.event.kind {
                 notify::EventKind::Create(..) => {
                     event.paths.iter().find_map(|p| self.detect_change(&p))
@@ -207,8 +207,8 @@ async fn main() -> Result<()> {
 async fn run_server() -> Result<()> {
     let ds = DirServer::new()?;
     ds.load_files()?;
-    let dir = Path::new(".");
-    let conn = Connection::open_in_memory()?;
+    // let dir = Path::new(".");
+    // let conn = Connection::open_in_memory()?;
     let livereload = LiveReloadLayer::new();
     let reloader = livereload.reloader();
     let service = ServeDir::new(&ds.dir)

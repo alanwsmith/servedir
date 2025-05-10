@@ -58,56 +58,32 @@ impl DirServer {
             None
         } else {
             if let Ok(new_hash) = self.hash_file(path) {
-                // dbg!(&new_hash);
                 if let Ok(mut stmt) = self.conn.prepare("SELECT hash FROM files WHERE path = ?") {
                     if let Ok(row) =
                         stmt.query_row([path.display().to_string()], |r| r.get::<usize, String>(0))
                     {
                         if &row != &new_hash {
-                            dbg!("changed");
-                            dbg!(&new_hash);
                             self.conn.execute(
                                 "UPDATE TABLE files SET hash = ? WHERE path = ?",
                                 (&new_hash, path.display().to_string()),
                             );
+                            Some(path.to_path_buf())
+                        } else {
+                            None
                         }
                     } else {
                         self.conn.execute(
                             "INSERT INTO files (path, hash) VALUES (?1, ?2)",
                             (path.display().to_string(), &new_hash),
                         );
+                        Some(path.to_path_buf())
                     }
-
-                    // if let Ok(rows) = stmt.query_map([path.display().to_string()], |row| {
-                    //     row.get::<usize, String>(0)
-                    // }) {
-                    //     if rows.count() == 0 {
-                    //         dbg!("adding fresh");
-                    //         self.conn.execute(
-                    //             "INSERT INTO files (path, hash) VALUES (?1, ?2)",
-                    //             (path.display().to_string(), &new_hash),
-                    //         );
-                    //     } else {
-                    //         dbg!("found something to compare");
-                    //     }
-                    // }
+                } else {
+                    None
                 }
-                None
             } else {
                 None
             }
-
-            //if stmt.query_row([format!("x{}", path.display().to_string())], |r| {
-            //    // let check_hash = r.get_unwrap::<usize, String>(0);
-            //    Ok(())
-            //}) {
-            //    dbg!("inserting data");
-            //    // let insert_data = "INSERT INTO files (path, hash) VALUES (?1, ?2)";
-            //    // self.conn
-            //    //     .execute(insert_data, (path.display().to_string(), hash))
-            //    //     .is_ok();
-            //    //
-            //};
         }
     }
 
@@ -246,7 +222,8 @@ async fn run_server() -> Result<()> {
         None,
         move |result: DebounceEventResult| {
             //if let Ok(debounced) = result {
-            if ds.process_event(result).is_some() {
+            if let Some(path) = ds.process_event(result) {
+                println!("{}", path.display());
                 reloader.reload();
             }
 

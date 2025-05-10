@@ -125,79 +125,6 @@ impl DirServer {
     }
 }
 
-//    // match event.event.kind {
-//    //     notify::EventKind::Create(..) => {
-//    //         false
-//    //         // if has_trigger_file(&event.paths) {
-//    //         //     true
-//    //         // } else {
-//    //         //     false
-//    //         // }
-//    //     }
-//    //     notify::EventKind::Modify(payload) => match payload {
-//    //         notify::event::ModifyKind::Data(change_type) => match change_type {
-//    //             _ => {
-//    //                 false
-//    //                 // if has_trigger_file(&event.paths) {
-//    //                 //     dbg!(&event);
-//    //                 //     true
-//    //                 // } else {
-//    //                 //     false
-//    //                 // }
-//    //             }
-//    //         },
-//    //         _ => false,
-//    //     },
-//    //     _ => false,
-//    // }
-
-//}) {
-//    //reloader.reload();
-//}
-//}
-
-//debounced.iter().filter_map(|event| {
-//    dbg!(&event);
-//    // event.is
-//    //find(|event| {
-//    //dbg!(event?);
-//    //false
-//    Some("asdf".to_string())
-//});
-
-//    // // dbg!(&event.event);
-//    // match event.event.kind {
-//    //     notify::EventKind::Create(..) => {
-//    //         false
-//    //         // if has_trigger_file(&event.paths) {
-//    //         //     true
-//    //         // } else {
-//    //         //     false
-//    //         // }
-//    //     }
-//    //     notify::EventKind::Modify(payload) => match payload {
-//    //         notify::event::ModifyKind::Data(change_type) => match change_type {
-//    //             _ => {
-//    //                 false
-//    //                 // if has_trigger_file(&event.paths) {
-//    //                 //     dbg!(&event);
-//    //                 //     true
-//    //                 // } else {
-//    //                 //     false
-//    //                 // }
-//    //             }
-//    //         },
-//    //         _ => false,
-//    //     },
-//    //     _ => false,
-//    // }
-//}) {
-//    //reloader.reload();
-//}
-//}
-
-// false
-
 #[tokio::main]
 async fn main() -> Result<()> {
     run_server().await?;
@@ -207,8 +134,6 @@ async fn main() -> Result<()> {
 async fn run_server() -> Result<()> {
     let ds = DirServer::new()?;
     ds.load_files()?;
-    // let dir = Path::new(".");
-    // let conn = Connection::open_in_memory()?;
     let livereload = LiveReloadLayer::new();
     let reloader = livereload.reloader();
     let service = ServeDir::new(&ds.dir)
@@ -223,38 +148,6 @@ async fn run_server() -> Result<()> {
                 println!("Reload via: {}", path.display());
                 reloader.reload();
             }
-
-            //if let Some(_) = debounced.iter().find(|event| {
-            //    // // dbg!(&event.event);
-            //    // match event.event.kind {
-            //    //     notify::EventKind::Create(..) => {
-            //    //         false
-            //    //         // if has_trigger_file(&event.paths) {
-            //    //         //     true
-            //    //         // } else {
-            //    //         //     false
-            //    //         // }
-            //    //     }
-            //    //     notify::EventKind::Modify(payload) => match payload {
-            //    //         notify::event::ModifyKind::Data(change_type) => match change_type {
-            //    //             _ => {
-            //    //                 false
-            //    //                 // if has_trigger_file(&event.paths) {
-            //    //                 //     dbg!(&event);
-            //    //                 //     true
-            //    //                 // } else {
-            //    //                 //     false
-            //    //                 // }
-            //    //             }
-            //    //         },
-            //    //         _ => false,
-            //    //     },
-            //    //     _ => false,
-            //    // }
-            //}) {
-            //    //reloader.reload();
-            //}
-            //}
         },
     )?;
     debouncer.watch(".", RecursiveMode::Recursive)?;
@@ -262,24 +155,6 @@ async fn run_server() -> Result<()> {
     axum::serve(listener, app).await.unwrap();
     Ok(())
 }
-
-// fn has_trigger_file(paths: &Vec<PathBuf>) -> bool {
-//     if let Some(path) = paths
-//         .iter()
-//         .filter(|p| p.is_file())
-//         .filter(|p| !p.ends_with("~"))
-//         .filter(|p| match p.file_name() {
-//             Some(name) => !name.to_string_lossy().starts_with("."),
-//             None => false,
-//         })
-//         .find_map(|p| Some(p))
-//     {
-//         println!("{}", path.display());
-//         true
-//     } else {
-//         false
-//     }
-// }
 
 async fn missing_page() -> Html<&'static str> {
     Html(

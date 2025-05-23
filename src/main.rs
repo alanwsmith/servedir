@@ -5,9 +5,11 @@ use axum::routing::get;
 use notify::RecursiveMode;
 use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::new_debouncer;
+use port_check::free_local_port_in_range;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 use tower_http::services::ServeDir;
 use tower_livereload::LiveReloadLayer;
@@ -132,6 +134,8 @@ async fn main() -> Result<()> {
 }
 
 async fn run_server() -> Result<()> {
+    let min_port = 5444;
+    let max_port = 6000;
     let ds = DirServer::new()?;
     ds.load_files()?;
     let livereload = LiveReloadLayer::new();
@@ -151,8 +155,20 @@ async fn run_server() -> Result<()> {
         },
     )?;
     debouncer.watch(".", RecursiveMode::Recursive)?;
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:5444").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    if let Some(port) = free_local_port_in_range(5444..=6000) {
+        println!("Starting folder server on port {}", port);
+        let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap();
+        launch_browser(port.into())?;
+        // TODO: handle error here if the server can't start
+        axum::serve(listener, app).await.unwrap();
+    } else {
+        println!(
+            "Could not find an avialable port between {} and {}",
+            min_port, max_port
+        );
+    }
     Ok(())
 }
 
@@ -164,4 +180,10 @@ async fn missing_page() -> Html<&'static str> {
 <body>Page Not Found</body>
 </html>"#,
     )
+}
+
+fn launch_browser(port: usize) -> Result<()> {
+    let args: Vec<String> = vec![format!("http://localhost:{}", port)];
+    Command::new("open").args(args).output()?;
+    Ok(())
 }
